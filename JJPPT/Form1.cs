@@ -37,6 +37,8 @@ namespace JJPPT
         public string movePath = string.Empty;
         public string defaultPath = AppDomain.CurrentDomain.BaseDirectory + "DefaultPath.ini";
         public string workId = "ww-0005";
+        Thread th = null;
+        Thread downLoadPPTThread = null;
 
         public Form1()
         {
@@ -67,53 +69,81 @@ namespace JJPPT
         }
         private void button1_Click(object sender, EventArgs e)
         {
-            CloseFireFoxAndGeckodriver();
-            if (!IsOk || !DownLoadCount())
+            string btnStr = this.button1.Text.Trim();
+            if (btnStr == "下 载 链 接")
             {
-                MessageBox.Show("数据故障！", "JJPPT");
-                return;
+                if (!IsOk)
+                {
+                    MessageBox.Show("数据故障！", "JJPPT");
+                    return;
+                }
+                //if (!IsAuthorised(workId))
+                //{
+                //    MessageBox.Show("请检查网络！", "JJPPT");
+                //    return;
+                //}
+                ToManageThread();
+                this.button1.Text = "暂 停";
             }
-            if (!IsAuthorised(workId))
+            else
             {
-                MessageBox.Show("请检查网络！", "JJPPT");
-                return;
+                this.button1.Text = "下 载 链 接";
+                if (th != null)
+                {
+                    th.Abort();
+                    th = null;
+                }
             }
-            ToManageThread();
         }
         private void button2_Click(object sender, EventArgs e)
         {
-            CloseFireFoxAndGeckodriver();
-            if (!IsOk || !DownLoadCount())
+            string btnStr = this.button2.Text.Trim();
+            if (btnStr == "下 载 PPT")
             {
-                MessageBox.Show("数据故障！", "JJPPT");
-                return;
+                CloseFireFoxAndGeckodriver();
+                if (!IsOk)
+                {
+                    MessageBox.Show("数据故障！", "JJPPT");
+                    return;
+                }
+
+                downLoadPath = this.textBox1.Text;
+                movePath = this.textBox2.Text;
+
+                if (string.IsNullOrEmpty(downLoadPath) || string.IsNullOrEmpty(movePath))
+                {
+                    MessageBox.Show("路径不能为空！", "JJPPT");
+                    return;
+                }
+                //if (!IsAuthorised(workId))
+                //{
+                //    MessageBox.Show("请检查网络！", "JJPPT");
+                //    return;
+                //}
+                File.WriteAllText(defaultPath, downLoadPath + "\r\n" + movePath);
+
+                sel = new SeleniumHelper(1);
+
+                sel.driver.Navigate().GoToUrl(url);
+                MessageBoxButtons message = MessageBoxButtons.OKCancel;
+                DialogResult dr = MessageBox.Show("请先登录成功后，再点击确定！", "JJPPT", message);
+                if (dr == DialogResult.OK)
+                {
+                    downLoadPPTThread = new Thread(DownLoadPPT);
+                    downLoadPPTThread.IsBackground = true;
+                    downLoadPPTThread.Start();
+                    this.button2.Text = "暂 停";
+                }
             }
-
-            downLoadPath = this.textBox1.Text;
-            movePath = this.textBox2.Text;
-
-            if (string.IsNullOrEmpty(downLoadPath) || string.IsNullOrEmpty(movePath))
+            else
             {
-                MessageBox.Show("路径不能为空！", "JJPPT");
-                return;
-            }
-            if (!IsAuthorised(workId))
-            {
-                MessageBox.Show("请检查网络！", "JJPPT");
-                return;
-            }
-            File.WriteAllText(defaultPath, downLoadPath + "\r\n" + movePath);
-
-            sel = new SeleniumHelper(1);
-
-            sel.driver.Navigate().GoToUrl(url);
-            MessageBoxButtons message = MessageBoxButtons.OKCancel;
-            DialogResult dr = MessageBox.Show("请先登录成功后，再点击确定！", "JJPPT", message);
-            if (dr == DialogResult.OK)
-            {
-                Thread downLoadPPTThread = new Thread(DownLoadPPT);
-                downLoadPPTThread.IsBackground = true;
-                downLoadPPTThread.Start();
+                this.button2.Text = "下 载 PPT";
+                if (downLoadPPTThread != null)
+                {
+                    downLoadPPTThread.Abort();
+                    downLoadPPTThread = null;
+                }
+                CloseFireFoxAndGeckodriver();
             }
         }
         private void textBox1_Click(object sender, EventArgs e)
@@ -144,7 +174,7 @@ namespace JJPPT
                 totalPages = GetTotalPages() * 32;
                 if (totalPages > 0)
                 {
-                    Thread th = new Thread(CyclicDownload);
+                    th = new Thread(CyclicDownload);
                     th.IsBackground = true;
                     th.Start();
                 }
@@ -261,7 +291,7 @@ namespace JJPPT
                 try
                 {
                     sel.driver.Navigate().GoToUrl(pptDto.PPTUrl);
-
+                    ((IJavaScriptExecutor)sel.driver).ExecuteScript("location.reload()");
                     Task task = Task.Run(() => ChangeNameAndMoveFile(pptDto.PPTName));
                     task.Wait();
 
@@ -289,7 +319,7 @@ namespace JJPPT
             bool flag = true;
             while (flag)
             {
-                Thread.Sleep(1000 * 2);
+                Thread.Sleep(1000);
                 if (Directory.Exists(downLoadPath))
                 {
                     DirectoryInfo theFolder = new DirectoryInfo(downLoadPath);
@@ -302,6 +332,9 @@ namespace JJPPT
                                 file.Extension.ToLower() == ".rar")
                             {
                                 newPath = movePath + @"\" + pptName + file.Extension;
+                                Thread.Sleep(1000);
+                                if (File.Exists(newPath))
+                                    File.Delete(newPath);
                                 File.Move(file.FullName, newPath);
                                 flag = false;
                             }
@@ -491,7 +524,7 @@ namespace JJPPT
             return false;
         }
         /// <summary>
-        /// 判断是否超过1000
+        /// 判断是否超过100
         /// </summary>
         /// <returns></returns>
         public bool DownLoadCount()
@@ -501,8 +534,8 @@ namespace JJPPT
             try
             {
                 string objStr = sqlLiteHelper.GetScalar(sqlStr).ToString();
-                int currentCount = IsNumeric(objStr) ? int.Parse(objStr) : 1000;
-                if (currentCount < 1000)
+                int currentCount = IsNumeric(objStr) ? int.Parse(objStr) : 100;
+                if (currentCount < 100)
                 {
                     result = true;
                 }
