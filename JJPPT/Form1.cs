@@ -316,6 +316,7 @@ namespace JJPPT
         public void ChangeNameAndMoveFile(string pptName)
         {
             string newPath = string.Empty;
+            string pptNameStr = string.Empty;
             bool flag = true;
             while (flag)
             {
@@ -329,9 +330,12 @@ namespace JJPPT
                         {
                             if (file.Extension.ToLower() == ".ppt" ||
                                 file.Extension.ToLower() == ".pptx" ||
-                                file.Extension.ToLower() == ".rar")
+                                file.Extension.ToLower() == ".rar" ||
+                                file.Extension.ToLower() == ".pptm" ||
+                                file.Extension.ToLower() == ".zip")
                             {
-                                newPath = movePath + @"\" + pptName + file.Extension;
+                                pptNameStr = FilteringIllegalCharacters(pptName);
+                                newPath = movePath + @"\" + pptNameStr + file.Extension;
                                 Thread.Sleep(1000);
                                 if (File.Exists(newPath))
                                     File.Delete(newPath);
@@ -346,6 +350,34 @@ namespace JJPPT
                     }
                 }
             }
+        }
+        /// <summary>
+        /// 过滤非法字符
+        /// </summary>
+        /// <param name="pptName"></param>
+        /// <returns></returns>
+        public string FilteringIllegalCharacters(string pptName)
+        {
+            if (pptName.Contains(@"\"))
+                pptName = pptName.Replace(@"\", "");
+            if (pptName.Contains(@"/"))
+                pptName = pptName.Replace(@"/", "");
+            if (pptName.Contains(@":"))
+                pptName = pptName.Replace(@":", "");
+            if (pptName.Contains(@"*"))
+                pptName = pptName.Replace(@"*", "");
+            if (pptName.Contains(@"?"))
+                pptName = pptName.Replace(@"?", "");
+            if (pptName.Contains('"'))
+                pptName = pptName.Replace('"', ' ');
+            if (pptName.Contains(@"<"))
+                pptName = pptName.Replace(@"<", "");
+            if (pptName.Contains(@">"))
+                pptName = pptName.Replace(@">", "");
+            if (pptName.Contains(@"|"))
+                pptName = pptName.Replace(@"|", "");
+
+            return pptName;
         }
         /// <summary>
         /// 获取ppt信息集合
