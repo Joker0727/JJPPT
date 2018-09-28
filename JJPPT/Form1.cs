@@ -541,7 +541,7 @@ namespace JJPPT
         /// <returns></returns>
         public bool IsAuthorised(string workId)
         {
-            string conStr = "Server=111.230.149.80;DataBase=MyDB;uid=sa;pwd=1add1&one";
+            string conStr = "";
             using (SqlConnection con = new SqlConnection(conStr))
             {
                 string sql = string.Format("select count(*) from MyWork Where PassState = 1 and WorkId ='{0}'", workId);
